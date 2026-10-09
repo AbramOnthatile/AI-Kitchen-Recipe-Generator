@@ -17,15 +17,20 @@ export default function IngredientInput({ onGenerated }) {
     setInput('')
   }
 
-  const generate = async () => {
+  const handleGenerate = async () => {
     if (!ingredients.length) return setError('Add at least one ingredient first.')
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const result = await api.generate(ingredients)
-      onGenerated(result)
+      if (typeof onGenerated === 'function') onGenerated(result)
       navigate('/results', { state: { result } })
-    } catch (exception) { setError(exception.message) }
-    finally { setLoading(false) }
+    } catch (exception) {
+      console.error('Recipe generation failed:', exception)
+      setError(exception.message || 'Unable to generate a recipe.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -41,7 +46,7 @@ export default function IngredientInput({ onGenerated }) {
         <div className="quick-add">{common.map((item) => <button key={item} onClick={() => addIngredient(item)}>{item}+ </button>)}</div>
         <div className="input-actions">
           <button className="secondary" onClick={() => setIngredients([])}>Clear ingredients</button>
-          <button className="primary" onClick={generate} disabled={loading}>{loading ? 'Analyzing your kitchen…' : 'Generate Everything'}</button>
+          <button className="primary" onClick={handleGenerate} disabled={loading}>{loading ? 'Analyzing your kitchen…' : 'Generate Everything'}</button>
         </div>
         {error && <div className="alert error">{error}</div>}
       </div>
