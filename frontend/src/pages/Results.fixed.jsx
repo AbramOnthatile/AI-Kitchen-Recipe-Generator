@@ -31,7 +31,7 @@ export default function Results() {
           <span className="eyebrow">Generation complete</span>
           <h1>{recipe.name}</h1>
         </div>
-        <span className="mode-badge">{result.local_mode ? 'Local Demo Mode' : 'AI Model Mode'}</span>
+        <span className="mode-badge">{result.local_mode ? 'Local Demo Mode' : 'AI Connected'}</span>
       </div>
 
       <div className="tabs">

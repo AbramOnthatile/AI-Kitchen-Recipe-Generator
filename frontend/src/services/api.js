@@ -21,6 +21,7 @@ async function request(path, options = {}) {
 
 export const api = {
   generate: (ingredients, platform = 'Instagram') => request('/api/recipes/generate-all/', { method: 'POST', body: JSON.stringify({ ingredients, platform }) }),
+  regenerateImage: (recipeId) => request(`/api/recipes/${recipeId}/generate-image/`, { method: 'POST', body: JSON.stringify({}) }),
   getPrompts: () => request('/api/prompts/'),
   createPrompt: (prompt) => request('/api/prompts/', { method: 'POST', body: JSON.stringify(prompt) }),
   updatePrompt: (id, prompt) => request(`/api/prompts/${id}/`, { method: 'PUT', body: JSON.stringify(prompt) }),

@@ -8,6 +8,9 @@ class GenerationHistory(models.Model):
     platform = models.CharField(max_length=40, default="Instagram")
     prompt = models.TextField(blank=True)
     prompt_score = models.PositiveSmallIntegerField(default=0)
+    image_url = models.TextField(blank=True, default="")
+    image_status = models.CharField(max_length=32, default="unavailable")
+    image_error = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -13,6 +13,9 @@ class Recipe(models.Model):
     match_percentage = models.PositiveSmallIntegerField(default=0)
     available_ingredients = models.JSONField(default=list)
     missing_ingredients = models.JSONField(default=list)
+    image_url = models.TextField(blank=True, default="")
+    image_status = models.CharField(max_length=32, default="unavailable")
+    image_error = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

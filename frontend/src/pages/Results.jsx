@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '../services/api'
 
 const copyText = async (text) => {
   await navigator.clipboard.writeText(text)
@@ -8,9 +9,22 @@ const copyText = async (text) => {
 
 export default function Results() {
   const { state } = useLocation()
-  const result = state?.result
+  const [result, setResult] = useState(state?.result || null)
   const [platform, setPlatform] = useState('Instagram')
   const [tab, setTab] = useState('recipe')
+  const [imageLoading, setImageLoading] = useState(false)
+  const [imageError, setImageError] = useState('')
+
+  useEffect(() => {
+    if (state?.result) {
+      setResult(state.result)
+      if (state.result.image?.status === 'error' || state.result.image?.status === 'unavailable') {
+        setImageError(state.result.image.error || 'Your recipe is ready, but its image could not be generated. Please try again.')
+      } else {
+        setImageError('')
+      }
+    }
+  }, [state])
 
   if (!result) {
     return (
@@ -23,16 +37,60 @@ export default function Results() {
 
   const recipe = result.recipe
   const post = result.social_media_post
+  const image = result.image || { status: 'unavailable' }
+
+  const handleRegenerateImage = async () => {
+    const recipeId = result.recipe_id || result.history_id
+    if (!recipeId) return
+    setImageLoading(true)
+    setImageError('')
+    try {
+      const nextImage = await api.regenerateImage(recipeId)
+      const nextResult = { ...result, image: nextImage.image }
+      setResult(nextResult)
+      if (nextImage.image.status === 'success') {
+        setImageError('')
+      } else {
+        setImageError(nextImage.image.error || 'Your recipe is ready, but its image could not be generated. Please try again.')
+      }
+    } catch (error) {
+      setImageError(error.message || 'Your recipe is ready, but its image could not be generated. Please try again.')
+    } finally {
+      setImageLoading(false)
+    }
+  }
 
   return (
     <main className="page-shell results-page">
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">Generation complete</span>
-          <h1>{recipe.name}</h1>
+      <div className="result-hero">
+        <div className="image-panel">
+          {image.status === 'success' && image.url ? (
+            <img src={image.url} alt={recipe.name} className="food-image" />
+          ) : imageLoading ? (
+            <div className="image-placeholder">Generating image…</div>
+          ) : (
+            <div className="image-error">
+              <strong>Image unavailable</strong>
+              <p>{image.error || 'Your recipe is ready, but its image could not be generated. Please try again.'}</p>
+            </div>
+          )}
         </div>
-        <span className="mode-badge">{result.local_mode ? 'Local Demo Mode' : 'AI Model Mode'}</span>
+
+        <div className="page-heading">
+          <div>
+            <span className="eyebrow">Generation complete</span>
+            <h1>{recipe.name}</h1>
+          </div>
+          <span className="mode-badge">{result.local_mode ? 'Local Demo Mode' : 'AI Connected'}</span>
+          {(image.status === 'error' || image.status === 'unavailable') && (
+            <div className="image-actions">
+              <button className="primary" onClick={handleRegenerateImage} disabled={imageLoading}>{imageLoading ? 'Generating...' : 'Regenerate Image'}</button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {imageError && <div className="alert error">{imageError}</div>}
 
       <div className="tabs">
         <button className={tab === 'recipe' ? 'active' : ''} onClick={() => setTab('recipe')}>Recipe</button>
