@@ -32,6 +32,13 @@ def _build_image_prompt(recipe, ingredients):
     )
 
 
+def _gemini_image_endpoint(base_url, model_name):
+    base = (base_url or "https://generativelanguage.googleapis.com/v1beta/").rstrip("/")
+    if "/models/" in base:
+        return f"{base}?key={settings.IMAGE_API_KEY}"
+    return f"{base}/models/{model_name}:generateContent?key={settings.IMAGE_API_KEY}"
+
+
 def generate_recipe_image(recipe, ingredients=None):
     missing = _missing_image_config()
     if missing:
@@ -42,21 +49,30 @@ def generate_recipe_image(recipe, ingredients=None):
         }
 
     prompt = _build_image_prompt(recipe, ingredients)
-    payload = {
-        "model": settings.IMAGE_MODEL,
-        "prompt": prompt,
-        "size": "1024x1024",
-        "quality": "high",
-        "response_format": "b64_json",
-    }
 
-    headers = {
-        "Authorization": f"Bearer {settings.IMAGE_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    if "generativelanguage.googleapis.com" in (settings.IMAGE_API_URL or ""):
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+        }
+        url = _gemini_image_endpoint(settings.IMAGE_API_URL, settings.IMAGE_MODEL)
+        headers = {"Content-Type": "application/json"}
+    else:
+        payload = {
+            "model": settings.IMAGE_MODEL,
+            "prompt": prompt,
+            "size": "1024x1024",
+            "quality": "high",
+            "n": 1,
+        }
+        url = settings.IMAGE_API_URL
+        headers = {
+            "Authorization": f"Bearer {settings.IMAGE_API_KEY}",
+            "Content-Type": "application/json",
+        }
 
     try:
-        request_obj = request.Request(settings.IMAGE_API_URL, data=json.dumps(payload).encode("utf-8"), headers=headers)
+        request_obj = request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers)
         with request.urlopen(request_obj, timeout=30) as response:
             raw = response.read().decode("utf-8", errors="replace")
     except (error.HTTPError, error.URLError, TimeoutError, ValueError) as exc:
@@ -75,6 +91,20 @@ def generate_recipe_image(recipe, ingredients=None):
         data = json.loads(raw)
     except json.JSONDecodeError:
         return {"status": "error", "error": "Image generation returned an invalid response.", "url": None}
+
+    if "generativelanguage.googleapis.com" in (settings.IMAGE_API_URL or ""):
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return {"status": "error", "error": "Image generation returned no candidates.", "url": None}
+
+        for candidate in candidates:
+            parts = candidate.get("content", {}).get("parts") or []
+            for part in parts:
+                if isinstance(part, dict) and part.get("inlineData", {}).get("data"):
+                    image_b64 = part["inlineData"]["data"]
+                    return {"status": "success", "url": f"data:image/png;base64,{image_b64}", "prompt": prompt}
+
+        return {"status": "error", "error": "Gemini image generation returned no usable inline image data.", "url": None}
 
     if isinstance(data, dict):
         image_candidates = data.get("data") or []

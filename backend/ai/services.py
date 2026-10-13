@@ -20,26 +20,41 @@ def _log_ai_error(message):
     print(message)
 
 
+def _gemini_endpoint(base_url, model_name):
+    base = (base_url or "https://generativelanguage.googleapis.com/v1beta/").rstrip("/")
+    if "/models/" in base:
+        return f"{base}?key={settings.AI_API_KEY}"
+    return f"{base}/models/{model_name}:generateContent?key={settings.AI_API_KEY}"
+
+
 def _call_llm(prompt):
     missing = _missing_ai_config()
     if missing:
         _log_ai_error(f"AI configuration is incomplete. Check {', '.join(missing)}.")
         return None
 
-    payload = json.dumps({
-        "model": settings.AI_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.5,
-    }).encode("utf-8")
-
-    headers = {
-        "Authorization": f"Bearer {settings.AI_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    if "generativelanguage.googleapis.com" in (settings.AI_API_URL or ""):
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.5},
+        }).encode("utf-8")
+        url = _gemini_endpoint(settings.AI_API_URL, settings.AI_MODEL)
+        headers = {"Content-Type": "application/json"}
+    else:
+        payload = json.dumps({
+            "model": settings.AI_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.5,
+        }).encode("utf-8")
+        url = settings.AI_API_URL
+        headers = {
+            "Authorization": f"Bearer {settings.AI_API_KEY}",
+            "Content-Type": "application/json",
+        }
 
     try:
-        request_obj = request.Request(settings.AI_API_URL, data=payload, headers=headers)
-        with request.urlopen(request_obj, timeout=20) as response:
+        request_obj = request.Request(url, data=payload, headers=headers)
+        with request.urlopen(request_obj, timeout=30) as response:
             result = json.loads(response.read().decode("utf-8"))
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -55,6 +70,23 @@ def _call_llm(prompt):
         return None
     except (error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
         _log_ai_error(f"AI request failed: {exc}")
+        return None
+
+    if "generativelanguage.googleapis.com" in (settings.AI_API_URL or ""):
+        candidates = result.get("candidates") or []
+        if not candidates:
+            _log_ai_error("AI response parsing failed: no candidates returned.")
+            return None
+        parts = candidates[0].get("content", {}).get("parts") or []
+        text_parts = []
+        for part in parts:
+            if isinstance(part, dict):
+                text = part.get("text")
+                if text:
+                    text_parts.append(text)
+        if text_parts:
+            return "".join(text_parts)
+        _log_ai_error("AI response parsing failed: invalid Gemini content format.")
         return None
 
     if result.get("error"):

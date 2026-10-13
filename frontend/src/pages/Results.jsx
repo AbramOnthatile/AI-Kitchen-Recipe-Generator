@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import CookingInstructions from '../components/CookingInstructions'
 import { api } from '../services/api'
 
 const copyText = async (text) => {
@@ -121,17 +122,7 @@ export default function Results() {
         </section>
       )}
 
-      {tab === 'instructions' && (
-        <section className="content-card">
-          <span className="card-label">Cooking instructions</span>
-          <ol className="steps">
-            {result.instructions.map((step, index) => (
-              <li key={index}><span>{index + 1}</span><p>{step}</p></li>
-            ))}
-          </ol>
-          <button className="secondary" onClick={() => copyText(result.instructions.join('\n'))}>Copy Instructions</button>
-        </section>
-      )}
+      {tab === 'instructions' && <CookingInstructions instructions={result.instructions} />}
 
       {tab === 'post' && (
         <section className="content-card">

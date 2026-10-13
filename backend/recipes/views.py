@@ -28,7 +28,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         result = generate_all(serializer.validated_data["ingredients"], serializer.validated_data["platform"], serializer.validated_data["servings"], serializer.validated_data["difficulty"])
         return Response(result, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], url_path="generate-image", url_name="generate-image")
     def generate_image(self, request, pk=None):
         recipe = get_object_or_404(Recipe, pk=pk)
         image = generate_recipe_image({
